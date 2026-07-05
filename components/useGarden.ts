@@ -1,18 +1,26 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { resolvePhase, type Phase } from "@/lib/phase";
 import { getDeviceId } from "@/lib/device";
 import { getLocalDate, getLocalHour } from "@/lib/client-time";
 
 export type Entry = { id: string; content: string; createdAt: number; reactionCount: number };
 
+const subscribe = () => () => {};
+
 export function useGarden() {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [phase, setPhase] = useState<Phase>("day");
   const [planted, setPlanted] = useState(false);
 
+  // phase는 보는 사람의 브라우저 로컬 시각에서 파생된다.
+  // 서버 스냅샷은 "day"로 고정해 하이드레이션 불일치를 피하고, 클라이언트에서 실제 시각으로 확정된다.
+  const phase = useSyncExternalStore<Phase>(
+    subscribe,
+    () => resolvePhase(getLocalHour()),
+    () => "day",
+  );
+
   useEffect(() => {
-    setPhase(resolvePhase(getLocalHour()));
     fetch("/api/entries")
       .then((r) => r.json())
       .then((d) => setEntries(d.entries ?? []))
